@@ -5,7 +5,6 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
-# Standard imports
 import json
 from optparse import OptionParser
 import os
@@ -25,17 +24,24 @@ from EventGenerator import GenericEventGenerator
 from commons.JSONConfigHelper import CheckJSONConfig, ReadJSONConfig
 from commons.Logger import ScriptLogger
 from WorkloadChecker import CheckWorkloadValidity
+sys.path = [FAAS_ROOT + '/synthetic_workload_invoker'] + sys.path
 
 logging.captureWarnings(True)
 logger = ScriptLogger('workload_invoker', 'SWI.log')
 
 
-APIHOST = subprocess.check_output(WSK_PATH + " property get --apihost", shell=True).split()[3]
-APIHOST = 'https://' + APIHOST.decode("utf-8")
-AUTH_KEY = subprocess.check_output(WSK_PATH + " property get --auth", shell=True).split()[2]
+APIHOST = subprocess.check_output(
+    WSK_PATH + " property get --apihost", shell=True).split()[3]
+# revert this,
+if False:
+    APIHOST = 'https://' + APIHOST.decode("utf-8")
+APIHOST = APIHOST.decode("utf-8")
+AUTH_KEY = subprocess.check_output(
+    WSK_PATH + " property get --auth", shell=True).split()[2]
 AUTH_KEY = AUTH_KEY.decode("utf-8")
 user_pass = AUTH_KEY.split(':')
-NAMESPACE = subprocess.check_output(WSK_PATH + " property get --namespace", shell=True).split()[2]
+NAMESPACE = subprocess.check_output(
+    WSK_PATH + " property get --namespace", shell=True).split()[2]
 NAMESPACE = NAMESPACE.decode("utf-8")
 RESULT = 'false'
 base_url = APIHOST + '/api/v1/namespaces/' + NAMESPACE + '/actions/'
@@ -73,6 +79,8 @@ def HTTPInstanceGenerator(action, instance_times, blocking_cli, param_file=None)
     authentication = (user_pass[0], user_pass[1])
     after_time, before_time = 0, 0
 
+    print('url ' + str(url))
+    print('auth ' + str(authentication))
     if param_file == None:
         st = 0
         for t in instance_times:
@@ -80,7 +88,9 @@ def HTTPInstanceGenerator(action, instance_times, blocking_cli, param_file=None)
             before_time = time.time()
             if st > 0:
                 time.sleep(st)
-            future = session.post(url, params=parameters, auth=authentication, verify=False)
+            future = session.post(url, params=parameters,
+                                  auth=authentication, verify=False)
+            # print("response: ", future.result())
             after_time = time.time()
     else:   # if a parameter file is provided
         try:

@@ -3,6 +3,7 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
+from GenConfigs import *
 import json
 import os
 from wskutil import request
@@ -11,10 +12,10 @@ import sys
 sys.path = ['./', '../'] + sys.path
 
 # Local
-from GenConfigs import *
 
-DB_CONFIG_FILE = os.path.expanduser(
-    WSK_PATH[:-3]+'/../ansible/db_local.ini')
+# DB_CONFIG_FILE = os.path.expanduser(
+#     WSK_PATH[:-3]+'ansible/db_local.ini')
+DB_CONFIG_FILE = "./db_local.ini"
 
 # Examples:
 # print(GetDBConfigs())
@@ -83,6 +84,7 @@ def GetActivationRecordsSince(since, limit=100):
     res = request('POST', url, body=json.dumps(body), headers=headers,
                   auth='%s:%s' % (configs['db_username'], configs['db_password']))
 
+    print("res: ", )
     return json.loads(res.read())
 
 

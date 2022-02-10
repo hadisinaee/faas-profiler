@@ -7,3 +7,14 @@ GenConfigs.py
 
 # compiled bytecode
 __pycache__/
+
+# virtualenv
+fass-profiler-env/
+
+# vscode
+.vscode/
+
+*.ini
+*.out
+myconfig.json
+capacity_factors.json
