@@ -7,3 +7,11 @@ GenConfigs.py
 
 # compiled bytecode
 __pycache__/
+
+# virtualenv
+venv/**
+
+activate
+myconfig.json
+launch.json
+test_metadata.out

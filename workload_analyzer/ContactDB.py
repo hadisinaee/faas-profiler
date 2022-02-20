@@ -13,9 +13,9 @@ sys.path = ['./', '../'] + sys.path
 # Local
 from GenConfigs import *
 
-DB_CONFIG_FILE = os.path.expanduser(
-    WSK_PATH[:-3]+'/../ansible/db_local.ini')
-
+# DB_CONFIG_FILE = os.path.expanduser(
+#     WSK_PATH[:-3]+'/../ansible/db_local.ini')
+DB_CONFIG_FILE='./db_local.ini'
 # Examples:
 # print(GetDBConfigs())
 # print(GetActivation(activation_id='e107e05a84cf469c87e05a84cf669c16', namespace='guest'))
