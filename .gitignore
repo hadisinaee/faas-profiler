@@ -15,3 +15,5 @@ activate
 myconfig.json
 launch.json
 test_metadata.out
+perf-mon.out
+blktrace-mon.out
