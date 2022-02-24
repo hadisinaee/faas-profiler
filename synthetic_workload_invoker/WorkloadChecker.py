@@ -78,4 +78,13 @@ def CheckWorkloadValidity(workload):
         logger_wlch.error("No random_seed field specified in the config file")
         return False
 
+    # 7- Platform has to be of ["knative", "openwhisk"]
+    if 'platform' in workload:
+        if workload['platform'] not in ['knative', 'openwhisk']:
+            logger_wlch.error('Platform should be either knative or openwhisk, expected: knative or openwhisk, got: ' + workload['platform'])
+            return False
+    else:
+        logger_wlch.error('No platform specified in the config file, add `platform: knative` or `platform: openwhisk` to your config file.')
+        return False
+    
     return True

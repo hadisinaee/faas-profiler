@@ -11,6 +11,7 @@ from optparse import OptionParser
 import os
 import requests
 from requests_futures.sessions import FuturesSession
+from concurrent.futures import as_completed
 import subprocess
 import sys
 import time
@@ -130,6 +131,74 @@ def BinaryDataHTTPInstanceGenerator(action, instance_times, blocking_cli, data_f
 
     return True
 
+def KnativeInstanceGenerator(action:str, instance_times:list, blocking_cli:bool, param_file=None) -> bool:
+    # there has to be a list of instance times for calling this function
+    if len(instance_times) == 0:
+        logger.error("No instance times provided; got: None for instance_times argument")
+        return False
+    
+    # read params for this action if not in cache
+    params = param_file_cache.get(param_file, None)
+    if param_file != None and params == None:
+        if not file_exists(param_file):
+            logger.error("param_file does not exist; got: {} for param_file argument".format(param_file))
+            return False
+
+        with open(file=param_file, mode='r') as f:
+            try:
+                params = json.load(f)
+                param_file_cache[param_file.strip()] = params
+            except Exception as e:
+                logger.error("Failed to read param_file {}: {}".format(param_file, e))
+                return False
+
+    # getting service name and url for the 'action' 
+    cmd_kn_list = 'kn service ls {0}'
+    action_name_url_str = subprocess.check_output([cmd_kn_list.format(action)], shell=True).decode("utf-8").splitlines()
+    if len(action_name_url_str) < 2:
+        logger.error("No service found for action: {0}".format(action))
+        logger.error("'kn service ls {0}' returned {1}".format(action, action_name_url_str))
+        logger.error("make sure have created the service for action '{0}' using 'kn service create'".format(action))
+        return False
+    # first line is header; ignore it.
+    action_name_url_str = action_name_url_str[1]
+    
+    # The second line is the service.
+    # The first two columns are the service name and the service url, respectively.
+    srv_name, srv_url  = action_name_url_str.split()[:2]
+
+    logger.info("calling the action using kn")
+    logger.info("service={0} @ {1}), params={2}, instance_times={3}".format(srv_name, srv_url, params, instance_times))
+
+    session = FuturesSession(max_workers=28)
+    called_at_ts, sleep_time, after_time, before_time = 0, 0, 0, 0
+    futures = [0]*len(instance_times)
+
+    for idx, t in enumerate(instance_times):
+        called_at_ts += t
+        sleep_time = sleep_time + t - (after_time - before_time)
+        
+        before_time = time.time()
+        if sleep_time > 0:
+            time.sleep(sleep_time)
+        
+        # todo: what if it is a post?
+        f = session.get(url=srv_url, params=params)
+        after_time = time.time()
+
+        futures[idx] = f
+
+        # save call time and the params
+        f.call_num = idx
+        f.param_file = param_file
+        f.sleep_time = sleep_time
+        f.called_at_ts = called_at_ts
+    
+    if blocking_cli:
+        for f in as_completed(futures):
+            logger.info("[call num: {0}] @ call time={1} ".format(f.call_num, f.called_at_ts))
+
+
 
 def main(argv):
     """
@@ -150,10 +219,31 @@ def main(argv):
     if not CheckWorkloadValidity(workload=workload):
         return False    # Abort the function if json file not valid
 
-    [all_events, event_count] = GenericEventGenerator(workload)
+    if workload['platform'] == 'knative':
+        logger.info("Knative platform detected")
+        blocking_cli = True
 
+
+    [all_events, event_count] = GenericEventGenerator(workload)
     threads = []
 
+    if workload['platform'] == 'knative':
+        logger.info("Knative platform detected")
+        for (instance_name, instance_times) in all_events.items():
+            # reading the instance object
+            instance = workload['instances'][instance_name]
+            
+            param_file = None if not 'param_file' in instance else instance['param_file']
+            data_file = None if not 'data_file' in instance else instance['data_file']
+            
+            if data_file is None:
+                threads.append(threading.Thread(target=KnativeInstanceGenerator, args=[
+                           instance['application'], instance_times, blocking_cli, param_file]))        
+            else:
+                threads.append(threading.Thread(target=KnativeInstanceGenerator, args=[
+                           instance['application'], instance_times, blocking_cli, data_file]))   
+
+    # all_events: dict(event_name: list(instance_times))
     for (instance, instance_times) in all_events.items():
         action = workload['instances'][instance]['application']
         try:
