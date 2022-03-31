@@ -9,6 +9,7 @@
 import json
 from optparse import OptionParser
 import os
+from os.path import exists as file_exists
 import requests
 from requests_futures.sessions import FuturesSession
 from concurrent.futures import as_completed
@@ -168,7 +169,7 @@ def KnativeInstanceGenerator(action:str, instance_times:list, blocking_cli:bool,
     srv_name, srv_url  = action_name_url_str.split()[:2]
 
     logger.info("calling the action using kn")
-    logger.info("service={0} @ {1}), params={2}, instance_times={3}".format(srv_name, srv_url, params, instance_times))
+    logger.info("service={0} @ {1}), params={2}, instance_times={3} blocking={4}".format(srv_name, srv_url, params, instance_times, blocking_cli))
 
     session = FuturesSession(max_workers=28)
     called_at_ts, sleep_time, after_time, before_time = 0, 0, 0, 0
@@ -219,9 +220,19 @@ def main(argv):
     if not CheckWorkloadValidity(workload=workload):
         return False    # Abort the function if json file not valid
 
+    monitoring_script_path = FAAS_ROOT
+    runtime_script = workload['perf_monitoring'].get('runtime_script', None)
+    if runtime_script != None:
+        monitoring_script_path = os.path.join(monitoring_script_path, runtime_script)
+        
+        if not file_exists(monitoring_script_path):
+            logger.error("Monitoring script does not exist at {}".format(monitoring_script_path))
+            return False
+
     if workload['platform'] == 'knative':
         logger.info("Knative platform detected")
-        blocking_cli = True
+        blocking_cli = workload['blocking_cli'] if workload['blocking_cli'] != None else False
+        logger.info(msg="setting the blocking_cli to {}".format(blocking_cli))
 
 
     [all_events, event_count] = GenericEventGenerator(workload)
@@ -269,13 +280,12 @@ def main(argv):
               "/synthetic_workload_invoker/test_metadata.out")
 
     try:
-        if workload['perf_monitoring']['runtime_script']:
-            runtime_script = 'bash ' + FAAS_ROOT + '/' + workload['perf_monitoring']['runtime_script'] + \
-                ' ' + str(int(workload['test_duration_in_seconds'])) + ' &'
-            os.system(runtime_script)
-            logger.info("Runtime monitoring script ran")
-    except:
-        pass
+        if runtime_script != None:
+            logger.info("Running monitoring script...")
+            exit_code = os.system("bash {} {} &".format(runtime_script, workload['test_duration_in_seconds']))
+            logger.info("Monitoring script ran with exit code: {}".format(exit_code))
+    except Exception as e:
+        logger.error("Failed to start monitoring script: {}".format(e))
 
     logger.info("Test started")
     for thread in threads:
